@@ -7,7 +7,7 @@ Created on Fri Apr 23 18:23:39 2021
 """
 import codigo_General
 
-
+path = 'Prueba/'
 
 #Nombres de los archivos
 archivo_tweets='PruebaLarreta_Tweets.txt'
@@ -20,13 +20,15 @@ archivo_grafo_hash='PruebaLarreta_grafo_hash.gexf'
 #De la bajada de datos no cambie nada.
 
 #Aca procesa y arma 1 csv con los tweets y un json con los usuarios 
-codigo_General.procesamiento(archivo_tweets,archivo_guardado ,archivo_usuarios)
+codigo_General.procesamiento(path + archivo_tweets,
+                             path + archivo_guardado,
+                             path + archivo_usuarios)
 
 
 #Acá se arma el objeto y se cargan los datos (se podría hacer todo junto si queremos)
 Larreta=codigo_General.Bases_Datos()
-Larreta.cargar_datos(archivo_guardado)
-Larreta.cargar_usuarios(archivo_usuarios)
+Larreta.cargar_datos(path + archivo_guardado)
+Larreta.cargar_usuarios(path + archivo_usuarios)
 
 #Funciones
 Larreta.plot_tipo_tweet()
@@ -35,6 +37,7 @@ Larreta.armar_grafo(tipo='usuarios',archivo_grafo=archivo_grafo,tipo_enlace='',d
 Larreta.armar_grafo(tipo='hashtags',archivo_grafo=archivo_grafo_hash,tipo_enlace='',dirigido=False)
 Larreta.agregar_centrality()
 Larreta.plot_nube()
+Larreta.plot_principales_Hashtags()
 Larreta.plot_nube_usuario('veronik50799452')
 
 

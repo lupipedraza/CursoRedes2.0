@@ -37,6 +37,7 @@ import string
 import io
 import os
 from os import path
+import seaborn as sbn
 
 #------------Funciones auxiliares--------------
 
@@ -71,8 +72,6 @@ def nube_palabras(textos_completos, archivo_imagen = ''):
             nos devuelva la nube de palabras asociada a la discusión durante esas fechas.
             """
 
-    
-    
             # Incorporamos todos los textos de los tweets a textos
 
             textos = []
@@ -96,6 +95,8 @@ def nube_palabras(textos_completos, archivo_imagen = ''):
                            contour_color = 'steelblue',
                            max_words = 100,
                            collocations=False).generate_from_text(textos)
+            sbn.set_context("paper", font_scale = 2)
+
             plt.figure(figsize = (10,8), dpi = 100)
             plt.title('Nube de Palabras', fontsize = 20)
             plt.imshow(wc, interpolation='bilinear')
@@ -105,8 +106,8 @@ def nube_palabras(textos_completos, archivo_imagen = ''):
             else:
                 plt.savefig(archivo_imagen,bbox_inches='tight')
                 plt.show()
-            plt.clf()
-
+            plt.clf()            
+            sbn.reset_orig()
 
 #------------FUNCIONES DE DESCARGA -----------
 # -------------- Defino las clases y funciones que darán lugar al streamer ------------
@@ -246,11 +247,12 @@ class Bases_Datos():
         usuarios_retweeteadores = set(self.tweets[self.tweets.relacion_nuevo_original == 'RT'].usuario_nuevo.values) #Conjunto de usuarios que retwitearon tweets
         usuarios_citadores = set(self.tweets[self.tweets.relacion_nuevo_original == 'QT'].usuario_nuevo.values) #Conjunto de usuarios que citaron
         
-        total_usuarios = len(set(usuarios_generadores.union(usuarios_retweeteadores).union(usuarios_citadores))) #Cantidad total de todos los usuarios
+        total_usuarios = len(usuarios_generadores.union(usuarios_retweeteadores).union(usuarios_citadores)) #Cantidad total de todos los usuarios
         
         
         #Realizar la la figura
-        plt.figure(figsize = (10,8), dpi = 300) 
+        sbn.set_context("paper", font_scale = 1.5)        
+        plt.figure(figsize = (11,8), dpi = 300) 
         plt.title('Rol de los Usuarios', fontsize = 20)
         v = venn3([usuarios_retweeteadores, usuarios_generadores, usuarios_citadores],
                   set_labels = ('Lxs que retweetean', 'Lxs que generan', 'lxs que citan'),
@@ -261,12 +263,15 @@ class Bases_Datos():
             except:
                 pass
         plt.text(-.05,-.65,'El total de usuarios registrados durante el período fue de : {}'.format(total_usuarios))
+
         if archivo_imagen=='':
             plt.show()
         else:
             plt.savefig(archivo_imagen,bbox_inches='tight')
             plt.show()
+        
         plt.clf()
+        sbn.reset_orig()
 
 
     def plot_tipo_tweet(self, archivo_imagen = ''):
@@ -279,14 +284,18 @@ class Bases_Datos():
         originales = set(self.tweets.id_original.values) #Conjunto de tweets originales
         rt = set(self.tweets[self.tweets.relacion_nuevo_original == 'RT'].id_nuevo.values) #Conjunto de retweets
         citas = set(self.tweets[self.tweets.relacion_nuevo_original == 'QT'].id_nuevo.values) #Conjunto de citas    
-        total_tweets = len(set(originales.union(rt).union(citas))) #Cantidad total de tweets
+        total_tweets = len(originales.union(rt).union(citas)) #Cantidad total de tweets
         
         # Realizar la figura
         labels = ['RT', 'Originales', 'QT'] 
-        sizes = [100*len(rt)/total_tweets, 100*len(originales)/total_tweets, 100*len(citas)/total_tweets]
-        plt.figure(figsize = (10,8), dpi = 300)
+        sizes = [100 * len(rt) / total_tweets, 100 * len(originales) / total_tweets, 100 * len(citas) / total_tweets]
+        
+        sbn.set_context("paper", font_scale = 1.5)
+        
+        plt.figure(figsize = (11,8), dpi = 300)
         plt.title('Tipos de Tweets', fontsize = 20)
-        plt.pie(sizes, labels = labels,autopct='%1.1f%%')
+        plt.pie(sizes, autopct='%1.1f%%')
+        plt.legend(labels)
         plt.axis('equal')
         plt.text(-.1,-1.2,'El total de tweets registrados durante el período fue de : {}'.format(total_tweets))
         if archivo_imagen=='':
@@ -295,48 +304,46 @@ class Bases_Datos():
             plt.savefig(archivo_imagen,bbox_inches='tight')
             plt.show()
         plt.clf()
-    
+        sbn.reset_orig()
         
-    def plot_evolucion_temporal(self, archivo_imagen = '',fecha_filtro = "2020-6-8 16:00:00"):
+    def plot_evolucion_temporal(self, archivo_imagen = '',fecha_filtro = "2021-4-23 18:00:00", frecuencia = '2min'):
         """
         Esta función toma como entrada el archivo de datos preprocesados y 
         devuelve la evolución temporal de cantidad de tweets, RT y QT
         """
         
-        d_total = pd.DataFrame(data = {'fecha' : [], 'Originales' : [], 'RT' : [], 'QT' : []}, dtype = str) #Armar un data frame nuevo para quedarse con la info que queremos
-        d = self.tweets[['id_original', 'fecha_original']].drop_duplicates() #Quedarse solo con la info de las fechas
-        d_total = d_total.append(d.rename(columns = {"id_original" : "Originales", "fecha_original" : "fecha"}), ignore_index = True, sort = True) #Agregar a la tabla los tweets con sus fechas
-        d = self.tweets[self.tweets.relacion_nuevo_original == 'RT'][['id_nuevo','fecha_nuevo']] #Reescribir las que son RT
-        d_total = d_total.append(d.rename(columns = {"id_nuevo" : "RT", "fecha_nuevo" : "fecha"}), ignore_index = True, sort = True)
-        d = self.tweets[self.tweets.relacion_nuevo_original == 'QT'][['id_nuevo','fecha_nuevo']] #Reescribir las que son QT
-        d_total = d_total.append(d.rename(columns = {"id_nuevo" : "QT", "fecha_nuevo" : "fecha"}), ignore_index = True, sort = True)
-        d_total['fecha'] = pd.to_datetime(d_total['fecha']) #Pasar el campo fecha al formato fecha
-        
-    
-        #Armar la figura
-        fig = plt.figure(figsize = (10, 8))
-        ax = fig.add_subplot(1, 1, 1)
-        ax2 = ax.twinx()
-        plotting_data = d_total.drop_duplicates()[d_total.fecha > pd.to_datetime(fecha_filtro).tz_localize('UTC')]
-        plotting_data = plotting_data[['Originales','RT','QT']].groupby([d_total.fecha.dt.year,d_total.fecha.dt.month,d_total.fecha.dt.day,d_total.fecha.dt.hour]).count()
-        plotting_data[['RT','QT']].plot(ax = ax,kind = 'line', rot = 80, linewidth = 2)
-        plotting_data['Originales'].plot(ax = ax2, kind = 'line', rot = 80, color = 'red', linewidth = 2)
-        ax.set_title('Evolución Temporal de la Actividad en Twitter', fontsize = 20)
-        ax.set_xlabel('Tiempo', fontsize = 15)
-        ax.set_ylabel('Cantidad de tweets', fontsize = 15)
-        ax.legend(fontsize = 15, loc = 'upper right')
-        ax2.legend(fontsize = 15, loc = 'upper left')
-        ax.set_xticklabels(plotting_data.index.to_numpy())
-        ax.grid('on', linestyle = 'dashed')
-        if archivo_imagen=="":
+        d = self.tweets[['id_original', 'fecha_original']].drop_duplicates().rename({'id_original' : 'id', 'fecha_original' : 'fecha'}, axis = 1)
+        d['relacion'] = 'Original'
+        d = d.append(self.tweets[['id_nuevo','fecha_nuevo','relacion_nuevo_original']].rename({'id_nuevo' : 'id', 'fecha_nuevo' : 'fecha', 'relacion_nuevo_original' : 'relacion'}, axis = 1))
+        d['fecha'] = d['fecha'].apply(pd.to_datetime, utc = None)
+        d = d[d.fecha > pd.to_datetime(fecha_filtro).tz_localize('utc')]
+        d = d.groupby([pd.Grouper(key = 'fecha',
+                                  freq = frecuencia),
+                       'relacion']).count().reset_index().rename({'relacion' : 'Tipo de Tweet'}, axis = 1)
+        sbn.set_context("paper", font_scale = 2)
+        fig, ax = plt.subplots(figsize = (11,8))
+        sbn.lineplot(x = 'fecha', y = 'id', data = d[d['Tipo de Tweet'] != 'RT'], hue = 'Tipo de Tweet', ax = ax)
+        ax_2 = ax.twinx()
+        sbn.lineplot(x = 'fecha', y = 'id', data = d[d['Tipo de Tweet'] == 'RT'], label = 'RT', ax = ax_2, color = 'green')
+        lines, labels = ax.get_legend_handles_labels()
+        lines2, labels2 = ax_2.get_legend_handles_labels()
+        ax.legend(loc = 'upper left')
+        ax_2.legend(lines + lines2, labels + labels2, loc='upper left')
+        ax_2.set_ylabel('Cantidad de RT',)
+        ax.set_ylabel('Cantidad de Tweets y QT',)
+        ax.set_xlabel('Fecha',)
+        ax.set_title('Evolución Temporal',)
+        ax.grid(linestyle = 'dashed')
+        if archivo_imagen == '':
             plt.show()
         else:
             plt.savefig(archivo_imagen,bbox_inches='tight')
             plt.show()
-        plt.clf()
+        plt.clf()            
+        sbn.reset_orig()
+        
 
-
-         # ----- Armar grafos para usar en Gephi
+    # ----- Armar grafos para usar en Gephi
     def armar_grafo(self,tipo='usuarios',archivo_grafo='',tipo_enlace='',dirigido=False):
     
         
@@ -456,29 +463,43 @@ class Bases_Datos():
 
   
 
-    def plot_nube(self,archivo_imagen = '',fecha_inicial = "2020-6-9 00:00:00", fecha_final = "2021-6-9 10:00:00"): 
+    def plot_nube(self, usuarios = None, archivo_imagen = '',fecha_inicial = "2020-6-9 00:00:00", fecha_final = "2021-6-9 10:00:00"): 
                           
-            #Separamos según si son datos de retweets o los tweets de un usuario    
-            datos=self.tweets
+            #Separamos según si son datos de retweets o los tweets de un usuario  
+            if usuarios == None:
+                datos = self.tweets.copy()
+            elif type(usuarios) == str:
+                datos = self.tweets[(self.tweets.usuario_nuevo == usuarios) | (self.tweets.usuario_original == usuarios)].copy()
+                
+            elif type(usuarios) == list:
+                datos = self.tweets[(self.tweets.usuario_nuevo.isin(usuarios)) | (self.tweets.usuario_original.isin(usuarios))].copy()
             datos.fecha_original = pd.to_datetime(datos.fecha_original) #Pasar a formato fecha
             datos.fecha_nuevo = pd.to_datetime(datos.fecha_nuevo) #Pasar a formato fecha
-            textos_originales = datos[datos.fecha_original > pd.to_datetime(fecha_inicial).tz_localize('UTC')][datos.fecha_original < pd.to_datetime(fecha_final).tz_localize('UTC')].texto_original.drop_duplicates().values #Quedarse con los textos originales en las fechas correctas
-            textos_qt = datos[datos.fecha_nuevo > pd.to_datetime(fecha_inicial).tz_localize('UTC')][datos.fecha_nuevo < pd.to_datetime(fecha_final).tz_localize('UTC')][datos.relacion_nuevo_original == 'QT'].texto_nuevo.drop_duplicates().values #Quedarse con los textos de las citas en las fechas correctas
+            textos_originales = datos[datos.fecha_original.between(pd.to_datetime(fecha_inicial).tz_localize('UTC'), pd.to_datetime(fecha_final).tz_localize('UTC'))].texto_original.drop_duplicates().values #Quedarse con los textos originales en las fechas correctas
+            textos_qt = datos[(datos.fecha_nuevo.between(pd.to_datetime(fecha_inicial).tz_localize('UTC'), pd.to_datetime(fecha_final).tz_localize('UTC'))) & (datos.relacion_nuevo_original == 'QT')].texto_nuevo.drop_duplicates().values #Quedarse con los textos de las citas en las fechas correctas
             # No incluimos RT, porque el texto es el mismo que en el original
             textos_completos=np.hstack([textos_originales,textos_qt])
             nube_palabras(textos_completos, archivo_imagen )
-        
-    #A ESTAS FUNCIONES LES FALTA UN TOQUE
-    def plot_nube_usuario(self,user_name,archivo_imagen = '',fecha_inicial = "2020-6-9 00:00:00", fecha_final = "2020-6-9 10:00:00"): 
     
-            datos=self.tweets[self.tweets.usuario_original==self.usuarios[user_name]]
-            self.plot_nube(datos,archivo_imagen,fecha_inicial, fecha_final)
-            
-    def plot_nube_comunas(self,user_name,archivo_imagen = '',fecha_inicial = "2020-6-9 00:00:00", fecha_final = "2020-6-9 10:00:00") :
-
-            #ACA FALTA COMPLETAR LAS NUBES POR COMUNAS
-            datos=self.tweets[self.tweets.usuario_original==self.usuarios[user_name]]
-            self.plot_nube(datos,archivo_imagen,fecha_inicial, fecha_final)        
+    def plot_principales_Hashtags(self, archivo_imagen = '', fecha_inicial = '', fecha_final = ''):
+        datos = pd.DataFrame(data = {'Hashtags' : ' '.join(self.tweets.hashtags_nuevo.dropna().values).split()})['Hashtags'].value_counts().sort_values(ascending = True).copy()
+        
+        sbn.set_context("paper", font_scale = 2)
+        fig, ax = plt.subplots(figsize = (11,8))
+        datos.plot(kind = 'barh', ax = ax)
+        ax.barh(y = range(len(datos)),
+                width = datos.values,
+                color = plt.get_cmap('Set2').colors,
+                tick_label = datos.keys())
+        ax.grid(linestyle = 'dashed')
+        ax.set_xlabel('Cantidad de Apariciones')
+        ax.set_title('Hashtags Principales')
+        if archivo_imagen == '':
+            plt.show()
+        else:
+            plt.savefig(archivo_imagen,bbox_inches='tight')
+            plt.show()            
+        sbn.reset_orig()
 
 # -------------- Defino una función de lectura y pre-procesamiento del archivo con los tweets descargados ------------
 
