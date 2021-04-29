@@ -38,7 +38,7 @@ Larreta.armar_grafo(tipo='hashtags',archivo_grafo=archivo_grafo_hash,tipo_enlace
 Larreta.agregar_centrality()
 Larreta.plot_nube()
 Larreta.plot_principales_Hashtags()
-Larreta.plot_nube_usuario('veronik50799452')
+Larreta.plot_nube('veronik50799452')
 
 
 #En cualquier momento se pueden acceder a las bases con

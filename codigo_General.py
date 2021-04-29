@@ -224,7 +224,11 @@ class Bases_Datos():
     def cargar_datos(self,archivo_datos):
         datos = pd.read_csv(archivo_datos,
                             sep = ',',
-                            error_bad_lines = False)
+                            error_bad_lines = False,
+                            dtype = {'id_nuevo' : object,
+                                     'id_original' : object},
+                            parse_dates = ['fecha_original','fecha_nuevo'],
+                            date_parser = pd.to_datetime)
         self.tweets=datos 
         
     def cargar_usuarios(self,archivo_usuarios):
