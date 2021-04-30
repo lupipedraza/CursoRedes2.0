@@ -34,10 +34,13 @@ import codecs
 import networkx as nx
 import community
 import string
-import io
 import os
 from os import path
 import seaborn as sbn
+import nltk
+nltk.download('stopwords')
+nltk.download('punkt')
+
 
 #------------Funciones auxiliares--------------
 
@@ -78,12 +81,13 @@ def nube_palabras(textos_completos, archivo_imagen = ''):
             for t in textos_completos:
                 textos.append(re.sub(r'https?:\/\/\S*', '', t, flags=re.MULTILINE).lower())
 
+            es_stop = nltk.corpus.stopwords.words('spanish')
             
             #Filtramos las stopwords y sacamos los .,' y tildes
-            stopwords_file = 'stopwords_spanish_modificado.txt'
+            
             textos = ''.join(textos).replace(',',' ').replace('.',' ').replace("'",' ').split(' ')
-            stopwords = codecs.open(stopwords_file,'r','utf8').read().split('\r\n')
-            textos_filtrado = list(filter(lambda x: x not in stopwords, textos))
+            
+            textos_filtrado = list(filter(lambda x: x not in es_stop, textos))
             textos = ' '.join(textos_filtrado)
             textos = saca_tildes(textos)
     
