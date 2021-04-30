@@ -38,6 +38,7 @@ import os
 from os import path
 import seaborn as sbn
 import nltk
+import math
 nltk.download('stopwords')
 nltk.download('punkt')
 
@@ -229,9 +230,9 @@ class Bases_Datos():
         datos = pd.read_csv(archivo_datos,
                             sep = ',',
                             error_bad_lines = False,
-                            dtype = {'id_nuevo' : object,
-                                     'id_original' : object},
-                            parse_dates = ['fecha_original','fecha_nuevo'],
+                            dtype = {'tw_id' : object,
+                                     'or_id' : object},
+                            parse_dates = ['tw_created_at','or_created_at'],
                             date_parser = pd.to_datetime)
         self.tweets=datos 
         
@@ -239,21 +240,27 @@ class Bases_Datos():
         with open(archivo_usuarios) as json_file:
              datos_usuarios= json.load(json_file)
         self.usuarios=datos_usuarios
-
+        
+    def cargar_grafo(self,archivo_grafo):
+        self.grafo=nx.read_gexf(archivo_grafo)
+        
     def guardar_datos(self,archivo_datos):
         self.tweets.to_csv(archivo_datos) 
         
     def guardar_usuarios(self,archivo_usuarios):
         with open(archivo_usuarios, 'w') as outfile:
             json.dump(self.usuarios, outfile)
+            
+    def guardar_usuaruis(self,archivo_grafo):
+        nx.write_gexf(self.grafo, archivo_grafo)
 
 
     # Analisis Estadisticos
     def plot_rol_usuario(self,archivo_imagen=''): # Rol de los usuarios a partir de los datos preprocesados 
 
-        usuarios_generadores = set(self.tweets.usuario_original.values) #Conjunto de usuarios que tienen tweets originales
-        usuarios_retweeteadores = set(self.tweets[self.tweets.relacion_nuevo_original == 'RT'].usuario_nuevo.values) #Conjunto de usuarios que retwitearon tweets
-        usuarios_citadores = set(self.tweets[self.tweets.relacion_nuevo_original == 'QT'].usuario_nuevo.values) #Conjunto de usuarios que citaron
+        usuarios_generadores = set(self.tweets.or_user_screenName.values) #Conjunto de usuarios que tienen tweets originales
+        usuarios_retweeteadores = set(self.tweets[self.tweets.relacion_nuevo_original == 'RT'].tw_user_screenName.values) #Conjunto de usuarios que retwitearon tweets
+        usuarios_citadores = set(self.tweets[self.tweets.relacion_nuevo_original == 'QT'].tw_user_screenName.values) #Conjunto de usuarios que citaron
         
         total_usuarios = len(usuarios_generadores.union(usuarios_retweeteadores).union(usuarios_citadores)) #Cantidad total de todos los usuarios
         
@@ -289,9 +296,9 @@ class Bases_Datos():
         """
         #Levantar los datos preprocesados del archivo
     
-        originales = set(self.tweets.id_original.values) #Conjunto de tweets originales
-        rt = set(self.tweets[self.tweets.relacion_nuevo_original == 'RT'].id_nuevo.values) #Conjunto de retweets
-        citas = set(self.tweets[self.tweets.relacion_nuevo_original == 'QT'].id_nuevo.values) #Conjunto de citas    
+        originales = set(self.tweets.tw_id.values) #Conjunto de tweets originales
+        rt = set(self.tweets[self.tweets.relacion_nuevo_original == 'RT'].or_id.values) #Conjunto de retweets
+        citas = set(self.tweets[self.tweets.relacion_nuevo_original == 'QT'].or_id.values) #Conjunto de citas    
         total_tweets = len(originales.union(rt).union(citas)) #Cantidad total de tweets
         
         # Realizar la figura
@@ -314,17 +321,25 @@ class Bases_Datos():
         plt.clf()
         sbn.reset_orig()
         
-    def plot_evolucion_temporal(self, archivo_imagen = '',fecha_filtro = "2021-4-23 18:00:00", frecuencia = '2min'):
+    def plot_evolucion_temporal(self, archivo_imagen = '',fecha_inicial = '',fecha_final = '', frecuencia = '2min'):
         """
         Esta función toma como entrada el archivo de datos preprocesados y 
         devuelve la evolución temporal de cantidad de tweets, RT y QT
         """
+        if fecha_final=='':
+            fecha_final=max(self.tweets['tw_created_at'])
+        else:
+            fecha_final=pd.to_datetime(fecha_final).tz_localize('UTC')
+        if fecha_inicial=='':
+            fecha_inicial=min(self.tweets['tw_created_at'])
+        else:
+            fecha_inicial=pd.to_datetime(fecha_inicial).tz_localize('UTC')
         
-        d = self.tweets[['id_original', 'fecha_original']].drop_duplicates().rename({'id_original' : 'id', 'fecha_original' : 'fecha'}, axis = 1)
+        d = self.tweets[['tw_id', 'tw_created_at']].drop_duplicates().rename({'or_id' : 'id', 'or_created_at' : 'fecha'}, axis = 1)
         d['relacion'] = 'Original'
-        d = d.append(self.tweets[['id_nuevo','fecha_nuevo','relacion_nuevo_original']].rename({'id_nuevo' : 'id', 'fecha_nuevo' : 'fecha', 'relacion_nuevo_original' : 'relacion'}, axis = 1))
-        d['fecha'] = d['fecha'].apply(pd.to_datetime, utc = None)
-        d = d[d.fecha > pd.to_datetime(fecha_filtro).tz_localize('utc')]
+        d = d.append(self.tweets[['tw_id','tw_created_at','relacion_nuevo_original']].rename({'tw_id' : 'id', 'tw_created_at' : 'fecha', 'relacion_nuevo_original' : 'relacion'}, axis = 1))
+        #d['fecha'] = d['fecha'].apply(pd.to_datetime, utc = None)
+        d = d[d.fecha.between(fecha_inicial, fecha_final)]
         d = d.groupby([pd.Grouper(key = 'fecha',
                                   freq = frecuencia),
                        'relacion']).count().reset_index().rename({'relacion' : 'Tipo de Tweet'}, axis = 1)
@@ -377,10 +392,10 @@ class Bases_Datos():
             enlace_peso={} #diccionario para poner cada enlace y su peso                      
             for i in range(len(datos)): #Para cada RT y/o QT
                 try:
-                    enlace_peso [(datos.usuario_nuevo.values[i], datos.usuario_original.values[i])]+=1 #Si ya existe sumar una al enlace
+                    enlace_peso [(datos.tw_user_screenName.values[i], datos.or_user_screenName.values[i])]+=1 #Si ya existe sumar una al enlace
                 except:
-                    enlace_peso [(datos.usuario_nuevo.values[i], datos.usuario_original.values[i])]=1 #Si no exista agregar el enlace
-                G.add_edge(datos.usuario_nuevo.values[i], datos.usuario_original.values[i],relacion=self.tweets.relacion_nuevo_original.values[i]) #Agregar los enclaces
+                    enlace_peso [(datos.tw_user_screenName.values[i], datos.or_user_screenName.values[i])]=1 #Si no exista agregar el enlace
+                G.add_edge(datos.tw_user_screenName.values[i], datos.or_user_screenName.values[i],relacion=self.tweets.relacion_nuevo_original.values[i]) #Agregar los enclaces
             
             nx.set_edge_attributes(G,enlace_peso,'weight') #Agregar los pesos
 
@@ -395,11 +410,11 @@ class Bases_Datos():
         else:
 
             if tipo=='menciones':
-               texto_usuario_original = self.tweets[['menciones_original','usuario_original']].drop_duplicates().dropna()+self.tweets[['menciones_original','usuario_nuevo']].drop_duplicates().dropna()
-               texto_usuario_original = texto_usuario_original.groupby(['usuario_original'])['hashtags_original'].apply(' '.join)        
+               texto_usuario_original = self.tweets[['or_menciones','or_user_screenName']].drop_duplicates().dropna()+self.tweets[['or_menciones','tw_user_screenName']].drop_duplicates().dropna()
+               texto_usuario_original = texto_usuario_original.groupby(['or_user_screenName'])['or_menciones'].apply(' '.join)        
             elif tipo=='hashtags':
-               texto_usuario_original = self.tweets[['hashtags_original','usuario_original']].drop_duplicates().dropna()+self.tweets[['hashtags_original','usuario_nuevo']].drop_duplicates().dropna()
-               texto_usuario_original = texto_usuario_original.groupby(['usuario_original'])['hashtags_original'].apply(' '.join)  
+               texto_usuario_original = self.tweets[['or_hashtags','or_user_screenName']].drop_duplicates().dropna()+self.tweets[['or_hashtags','tw_user_screenName']].drop_duplicates().dropna()
+               texto_usuario_original = texto_usuario_original.groupby(['or_user_screenName'])['or_hashtags'].apply(' '.join)  
             else:
                 print('tipo solo puede ser usuarios, menciones o hashtags')
        
@@ -471,26 +486,45 @@ class Bases_Datos():
 
   
 
-    def plot_nube(self, usuarios = None, archivo_imagen = '',fecha_inicial = "2020-6-9 00:00:00", fecha_final = "2021-6-9 10:00:00"): 
-                          
+    def plot_nube(self, usuarios = None, archivo_imagen = '',fecha_inicial = '', fecha_final = ''): 
+            if fecha_final=='':
+                fecha_final=max(self.tweets['tw_created_at'])
+            else:
+                fecha_final=pd.to_datetime(fecha_final).tz_localize('UTC')
+            if fecha_inicial=='':
+                fecha_inicial=min(self.tweets['tw_created_at'])
+            else:
+                fecha_inicial=pd.to_datetime(fecha_inicial).tz_localize('UTC')
+
             #Separamos según si son datos de retweets o los tweets de un usuario  
             if usuarios == None:
                 datos = self.tweets.copy()
             elif type(usuarios) == str:
-                datos = self.tweets[(self.tweets.usuario_nuevo == usuarios) | (self.tweets.usuario_original == usuarios)].copy()
+                datos = self.tweets[(self.tweets.tw_user_screenName == usuarios) | (self.tweets.or_user_screenName == usuarios)].copy()
                 
             elif type(usuarios) == list:
-                datos = self.tweets[(self.tweets.usuario_nuevo.isin(usuarios)) | (self.tweets.usuario_original.isin(usuarios))].copy()
-            datos.fecha_original = pd.to_datetime(datos.fecha_original) #Pasar a formato fecha
-            datos.fecha_nuevo = pd.to_datetime(datos.fecha_nuevo) #Pasar a formato fecha
-            textos_originales = datos[datos.fecha_original.between(pd.to_datetime(fecha_inicial).tz_localize('UTC'), pd.to_datetime(fecha_final).tz_localize('UTC'))].texto_original.drop_duplicates().values #Quedarse con los textos originales en las fechas correctas
-            textos_qt = datos[(datos.fecha_nuevo.between(pd.to_datetime(fecha_inicial).tz_localize('UTC'), pd.to_datetime(fecha_final).tz_localize('UTC'))) & (datos.relacion_nuevo_original == 'QT')].texto_nuevo.drop_duplicates().values #Quedarse con los textos de las citas en las fechas correctas
+                datos = self.tweets[(self.tweets.tw_user_screenName.isin(usuarios)) | (self.tweets.or_user_screenName.isin(usuarios))].copy()
+            #datos.fecha_original = pd.to_datetime(datos.fecha_original) #Pasar a formato fecha
+            #datos.fecha_nuevo = pd.to_datetime(datos.fecha_nuevo) #Pasar a formato fecha
+            textos_originales = datos[datos.or_created_at.between(fecha_inicial, fecha_final)].or_text.drop_duplicates().values #Quedarse con los textos originales en las fechas correctas
+            textos_qt = datos[(datos.tw_created_at.between(fecha_inicial,fecha_final)) & (datos.relacion_nuevo_original == 'QT')].tw_text.drop_duplicates().values #Quedarse con los textos de las citas en las fechas correctas
             # No incluimos RT, porque el texto es el mismo que en el original
             textos_completos=np.hstack([textos_originales,textos_qt])
             nube_palabras(textos_completos, archivo_imagen )
     
     def plot_principales_Hashtags(self, archivo_imagen = '', fecha_inicial = '', fecha_final = ''):
-        datos = pd.DataFrame(data = {'Hashtags' : ' '.join(self.tweets.hashtags_nuevo.dropna().values).split()})['Hashtags'].value_counts().sort_values(ascending = True).copy()
+        if fecha_final=='':
+            fecha_final=max(self.tweets['tw_created_at'])
+        else:
+            fecha_final=pd.to_datetime(fecha_final).tz_localize('UTC')
+        if fecha_inicial=='':
+            fecha_inicial=min(self.tweets['tw_created_at'])
+        else:
+            fecha_inicial=pd.to_datetime(fecha_inicial).tz_localize('UTC')
+
+        d= self.tweets[(self.tweets.tw_created_at.between(fecha_inicial, fecha_final))|((self.tweets.relacion_nuevo_original=='Original') & (self.tweets.or_created_at.between(fecha_inicial, fecha_final)))]
+        
+        datos = pd.DataFrame(data = {'Hashtags' : ' '.join(d.tw_hashtags.dropna().values).split()})['Hashtags'].value_counts().sort_values(ascending = True).copy()
         
         sbn.set_context("paper", font_scale = 2)
         fig, ax = plt.subplots(figsize = (11,8))
@@ -513,76 +547,94 @@ class Bases_Datos():
 
 
 def guardar_tweet(tweet):
-                id_nuevo = tweet['id_str'] # ID identificatorio del tweet
-                if 'extended_tweet' in tweet.keys():
-                    texto_nuevo = tweet['extended_tweet']['full_text'].replace(',',' ').replace('\n',' ') # texto del tweet nuevo
-                else:
-                    texto_nuevo = tweet['text'].replace(',',' ').replace('\n',' ')
-                usuario_nuevo = tweet['user']['screen_name'] # nombre del usuario que genera el tweet
-                fecha_nuevo = pd.to_datetime(tweet['created_at']) - timedelta(hours = 3) #Fecha del Tweet nuevo
-                #Incorporamos en hastags_nuevo los hastags con el formato 'hash1 hash2 ...' y  ' si no hay
-                hashtags_nuevo = ''
-                if len(tweet['entities']['hashtags']) != 0:
-                    for h in tweet['entities']['hashtags']:
-                        hashtags_nuevo += h['text'] + ' '
-                #Incorporamos en menciones_nuevo las menciones con el formato 'men1 men2 ...' y  ' si no hay
-                menciones_nuevo = ''
-                if len(tweet['entities']['user_mentions']) != 0:
-                    for um in tweet['entities']['user_mentions']:
-                        menciones_nuevo += um['screen_name'] + ' '
-                
-                # El tweet original según si es retweet o cita
-                
-                    
-                return(            id_nuevo,
-                                   texto_nuevo,
-                                   usuario_nuevo,
-                                   fecha_nuevo,
-                                   hashtags_nuevo,
-                                   menciones_nuevo)                    
 
+            data={}
+            data['tw_id']=tweet['id_str']
+            data['tw_created_at']=tweet['created_at']
+            try:
+                data['tw_text']=tweet['extended_tweet']['full_text'].replace('\n',' ').replace(',',' ')
+            except:
+                data['tw_text']=tweet['text'].replace('\n',' ').replace(',',' ')
+
+            data['tw_favCount']=tweet['favorite_count']
+            data['tw_rtCount']=tweet['retweet_count']
+            data['tw_qtCount']=tweet['quote_count']
+            data['tw_rpCount']=tweet['reply_count']
+            try:
+                data['tw_location']=tweet['place']['full_name'].replace(',',' ')
+            except:
+                data['tw_location']=' '
+            data['user_id']=tweet['user']['id_str']
+            data['user_screenName']=tweet['user']['screen_name']
+            hashtags = ''
+            if len(tweet['entities']['hashtags']) != 0:
+                for h in tweet['entities']['hashtags']:
+                    hashtags += h['text'] + ' '
+            data['tw_hashtags']=hashtags
+            menciones = ''
+            if len(tweet['entities']['user_mentions']) != 0:
+                for um in tweet['entities']['user_mentions']:
+                    menciones += um['screen_name'] + ' '
+            data['tw_menciones']=menciones
+            
+            data['tw_created_at'] = pd.to_datetime(data['tw_created_at'])
+            # data.to_csv(nombre_archivo_guardado, sep = ',') # podría ya grabar el archivo procesado
+            return data
+    
 def guardar_usuario(usuario):
-                        dic={}
-                        dic['screen_name'] = usuario['screen_name'] #screen name
-                        dic['name'] = usuario['name'].replace(',',' ').replace('\n',' ')# nombre del usuario que genera el tweet (sin comas ni enters) 
-                        dic['id']=usuario['id'] #id del usuario
-                        try: #location (si tiene, sin comas ni enters)
-                            dic['location']=usuario['location'].replace(',',' ').replace('\n',' ')
-                        except:
-                            dic['location']=0
-                        try:   #Descripción, si tiene, sin comas, enters ni links y en minúsculas
-                            dic['description']=re.sub(r'https?:\/\/\S*', '', usuario['description'].replace(',',' ').replace('\n',' '), flags=re.MULTILINE).lower()
-                        except:
-                            dic['description']=0
-                        #El resto de los atributos
-                        dic['verified']=usuario['verified']
-                        dic['followers_count']=usuario['followers_count']
-                        dic['friends_count']=usuario['friends_count']
-                        dic['listed_count']=usuario['listed_count']
-                        dic['favourites_count']=usuario['favourites_count']
-                        dic['statuses_count']=usuario['statuses_count']
-                        dic['created_at']=usuario['created_at']#pd.to_datetime(usuario['created_at']) - timedelta(hours = 3) #formato fecha
-                        return(dic)
+        data={}
+        data['id_str']=usuario['id_str']
+        data['screen_name']=usuario['screen_name']
+        try:
+            data['description']=usuario['description'].replace('\n',' ')
+        except:
+            data['description']=' '
+        data['verified']=usuario['verified']
+        data['followers_count']=usuario['followers_count']
+        data['friends_count']=usuario['friends_count']
+        data['listed_count']=usuario['listed_count']
+        data['favourites_count']=usuario['favourites_count']
+        data['statuses_count']=usuario['statuses_count']
+        data['created_at']=usuario['created_at']
+        data['location']=usuario['location']
+        if usuario['location'] is None:
+            data['location']=' '
+            
+        return(data)
 
 def procesamiento(archivo_tweets,archivo_guardado,archivo_usuarios):
         usuarios={}
         with open(archivo_guardado, 'w', encoding = 'utf-8') as arch:
-                    arch.write('{},{},{},{},{},{},{},{},{},{},{},{},{}\n'.format("id_nuevo",
-                               "texto_nuevo",
-                               "usuario_nuevo",
-                               "fecha_nuevo",
-                               "hashtags_nuevo",
-                               "menciones_nuevo",
+                    arch.write('{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n'.format(
+                            
+            'tw_id' , # id del tweet
+            'tw_created_at', # fecha de creacion
+            'tw_text' , # texto
+            'tw_favCount' , # cantidad de megustas
+            'tw_rtCount' , # cantidad de rt
+            'tw_qtCount' , # cantidad de citas
+            'tw_rpCount' , # cantidad de comentarios
+            'tw_location' , # location del tweet (usaremos el place)
+            'tw_user_id' , # id del usuario
+            'tw_user_screenName', # screen name del usuario
+            'tw_hashtags',
+            'tw_menciones',
                               
                                
-                               "id_original",
-                               "texto_original",
-                               "usuario_original",
-                               "fecha_original",
-                               "hashtags_original",
-                               "menciones_original",
-
-                               "relacion_nuevo_original"))
+            'or_id', # id del tweet
+            'or_created_at', # fecha de creacion
+            'or_text', # texto
+            'or_favCount', # cantidad de megustas
+            'or_rtCount', # cantidad de rt
+            'or_qtCount', # cantidad de citas
+            'or_rpCount', # cantidad de comentarios
+            'or_location', # location del tweet (usaremos el place)
+            'or_user_id' , # id del usuario
+            'or_user_screenName', # screen name del usuario
+            'or_hashtags',
+            'or_menciones',
+            
+            'relacion_nuevo_original'))
 
         with open(archivo_tweets, 'r', buffering = 1000000) as f:
             for line in f.read().split('\n'):
@@ -601,10 +653,10 @@ def procesamiento(archivo_tweets,archivo_guardado,archivo_usuarios):
                         
                         #Guardamos toda la fila
                         with open(archivo_guardado, 'a', encoding = 'utf-8') as arch:
-                            t1,t2,t3,t4,t5,t6=guardar_tweet(tweet)
-                            arch.write('{},{},{},{},{},{},'.format(t1,t2,t3,t4,t5,t6))
-                            t1,t2,t3,t4,t5,t6=guardar_tweet(tweet_original)
-                            arch.write('{},{},{},{},{},{},'.format(t1,t2,t3,t4,t5,t6))
+                            #t1,t2,t3,t4,t5,t6=guardar_tweet(tweet)
+                            arch.write('{},{},{},{},{},{},{},{},{},{},{},{},'.format(*guardar_tweet(tweet).values()))
+                            #t1,t2,t3,t4,t5,t6=guardar_tweet(tweet_original)
+                            arch.write('{},{},{},{},{},{},{},{},{},{},{},{},'.format(*guardar_tweet(tweet_original).values()))
                             arch.write('{}\n'.format(relacion_nuevo_original))                    #Citas
                     elif 'quoted_status' in tweet.keys(): #Si el original es una cita
                         tweet_original = tweet['quoted_status']
@@ -614,17 +666,18 @@ def procesamiento(archivo_tweets,archivo_guardado,archivo_usuarios):
                         relacion_nuevo_original = 'QT' #Guardamos que la relación es un retweet
     
                         with open(archivo_guardado, 'a', encoding = 'utf-8') as arch:
-                            t1,t2,t3,t4,t5,t6=guardar_tweet(tweet)
-                            arch.write('{},{},{},{},{},{},'.format(t1,t2,t3,t4,t5,t6))
-                            t1,t2,t3,t4,t5,t6=guardar_tweet(tweet_original)
-                            arch.write('{},{},{},{},{},{},'.format(t1,t2,t3,t4,t5,t6))
+                            #t1,t2,t3,t4,t5,t6=guardar_tweet(tweet).values()
+                            arch.write('{},{},{},{},{},{},{},{},{},{},{},{},'.format(*guardar_tweet(tweet).values()))
+                            #t1,t2,t3,t4,t5,t6=guardar_tweet(tweet_original).values()
+                            arch.write('{},{},{},{},{},{},{},{},{},{},{},{},'.format(*guardar_tweet(tweet_original).values()))
                             arch.write('{}\n'.format(relacion_nuevo_original))
                     else:
                         relacion_nuevo_original = 'Original' #Guardamos que la relación es un retweet
                         with open(archivo_guardado, 'a', encoding = 'utf-8') as arch:
-                            t1,t2,t3,t4,t5,t6=guardar_tweet(tweet)
-                            arch.write('{},{},{},{},{},{},'.format(t1,t2,t3,t4,t5,t6))
-                            arch.write('{},{},{},{},{},{},'.format("","","","","",""))
+                            #t1,t2,t3,t4,t5,t6=guardar_tweet(tweet).values()
+                            arch.write('{},{},{},{},{},{},{},{},{},{},{},{},'.format("","","","","","","","","","","",""))
+                            arch.write('{},{},{},{},{},{},{},{},{},{},{},{},'.format(*guardar_tweet(tweet).values()))
+
                             arch.write('{}\n'.format(relacion_nuevo_original))   
                     
                     with open(archivo_usuarios, 'w') as outfile:
@@ -634,145 +687,4 @@ def procesamiento(archivo_tweets,archivo_guardado,archivo_usuarios):
 
                 
 
-# --------- Defino función auxiliar para ordenar comunidades----------------
-def ordeno_comunidades(diccionario):
-    '''
-    Esta es una función auxiliar para ordenar las comunas por tamaño, utilizada en las nubes de palabras
-    '''
-    
-    lista_com = list(diccionario.values()) 
-    lista_com_ordenadas = [] #Acá vamos a agregar a las comunas sus tamaños
-    for c in set(lista_com): #Armar la nueva lista
-        lista_com_ordenadas.append([lista_com.count(c), c]) 
-    lista_com_ordenadas = sorted(lista_com_ordenadas, reverse = True) #Ordenarla por tamaño
-    lista_com_ordenadas = [lista_com_ordenadas[i][1] for i in range(len(lista_com_ordenadas))] #Sacarle el tamaño
-    return lista_com_ordenadas
 
-
-#---------- Defino función que permite generar nubes de palabras en función de la comuna a la que correspondan-------------
-
-def nube_de_palabras_por_comuna_textos(archivo_procesado, archivo_grafo, archivo_imagen,n_comunas = 5):
-    """
-    Le paso el archivo procesado y le paso
-    el archivo de grafo (es el que tiene la información sobre las comunas)
-    
-    La idea es que devuelva una nube de palabras para cada una de las principales n comunas
-    """
-    #Levantar los datos del archivo
-    datos = pd.read_csv(archivo_procesado,
-                            sep = ',',
-                            error_bad_lines = False)
-    
-    #Levantar el grafo y las comunidades
-    grafo = nx.read_gexf(archivo_grafo)
-    comunidades = dict(nx.get_node_attributes(grafo,'Comunidad_Louvain'))
-    print(comunidades)
-    del grafo #Elimino el grafo para que no ocupe espacio
-    
-    #Incorporo a los datos los valores de las comunas del usuario del tweet nuevo y del original    
-    datos['Comuna_Nuevo'] = [comunidades[usuario] if usuario in comunidades.keys() else None for usuario in datos.usuario_nuevo.values]
-    datos['Comuna_Original'] = [comunidades[usuario] if usuario in comunidades.keys() else None for usuario in datos.usuario_original.values]    
-    
-    comunidades_ordenadas = ordeno_comunidades(comunidades) #Ordeno las comunidades
-
-    for c in comunidades_ordenadas[:n_comunas]:  #para las n primeras comunidades (las más grandes, porque está ordenado)     
-        textos_originales = datos[datos.Comuna_Original == c].texto_original.drop_duplicates().values #Los textos de esas comunas originales
-        textos_qt = datos[datos.Comuna_Nuevo == c][datos.relacion_nuevo_original == 'QT'].texto_nuevo.drop_duplicates().values #Las citas de esas comunas
-        # No incluimos RT, porque el texto es el mismo que en el original
-
-        textos = [] #Juntamos todos los textos (con minúsculas y sin links)
-        for t in textos_originales:
-            textos.append(re.sub(r'https?:\/\/\S*', '', t, flags=re.MULTILINE).lower())
-        for t in textos_qt:
-            textos.append(re.sub(r'https?:\/\/\S*', '', t, flags=re.MULTILINE).lower())
-
-        #Filtramos las stopwords
-        stopwords_file = 'stopwords_spanish_modificado.txt'
-        textos = ''.join(textos).replace(',',' ').replace('.',' ').replace("'",' ').split(' ')
-        stopwords = codecs.open(stopwords_file,'r','utf8').read().split('\r\n')
-        textos_filtrado = list(filter(lambda x: x not in stopwords, textos))
-        textos = ' '.join(textos_filtrado)
-        textos = saca_tildes(textos)
-        wc = WordCloud(width=1600,
-                       height=800,
-                       background_color = "white",
-                       contour_width = 3,
-                       contour_color = 'steelblue',
-                       max_words = 100,
-                       collocations=False).generate_from_text(textos)
-        plt.figure(figsize = (10,8), dpi = 100)
-        plt.title('Nube de Palabras - Comuna {}'.format(c), fontsize = 20)
-        plt.imshow(wc, interpolation='bilinear')
-        plt.axis("off")
-        plt.savefig(archivo_imagen[:-4] + 'Comuna{}'.format(c) + archivo_imagen[-4:],bbox_inches='tight')
-    #    plt.show()
-        plt.clf()
-    
-def nube_de_palabras_por_comuna_descripciones(archivo_procesado, archivo_grafo, archivo_imagen,n_comunas = 5):
-    """
-    Le paso el archivo procesado de usuarios y le paso
-    el archivo de grafo (es el que tiene la información sobre las comunas)
-    
-    La idea es que devuelva una nube de palabras para cada una de las principales n comunas
-    """
-    
-    #Levantar los datos del archivo
-    datos = pd.read_csv(archivo_procesado,
-                        sep = ',',
-                        error_bad_lines = False,
-                        #encoding = 'latin-1',
-                        encoding='utf8',
-                        lineterminator='\n')
-    
-    #Levantar el grafo y las comunidades
-    grafo = nx.read_gexf(archivo_grafo)
-    comunidades = dict(nx.get_node_attributes(grafo,'Comunidad_Louvain'))
-    del grafo #Elimino el grafo para que no ocupe espacio
-    
-    #Incorporo a los datos los valores de las comunas del usuario del tweet nuevo y del original    
-    datos['Comuna'] = [comunidades[usuario] if usuario in comunidades.keys() else None for usuario in datos.screen_name.values]
-    comunidades_ordenadas = ordeno_comunidades(comunidades) #Ordeno las comunidades
-    
-    for c in comunidades_ordenadas[:n_comunas]:   #para las n primeras comunidades (las más grandes, porque está ordenado)          
-        textos_descripciones = datos[datos.Comuna == c].description.drop_duplicates().values
-        textos = [] #Juntamos todos los textos (con minúsculas y sin links)
-        for t in textos_descripciones:
-            try:
-                textos.append(re.sub(r'https?:\/\/\S*', '', t, flags=re.MULTILINE).lower())
-            except:
-                pass
-            
-        #Filtramos las stopwords
-        stopwords_file = 'stopwords_spanish_modificado.txt'
-        textos = ''.join(textos).replace(',',' ').replace('.',' ').replace("'",' ').split(' ')
-        stopwords = codecs.open(stopwords_file,'r','utf8').read().split('\r\n')
-        textos_filtrado = list(filter(lambda x: x not in stopwords, textos))
-        textos = ' '.join(textos_filtrado)
-        textos = saca_tildes(textos)
-
-        #Acomodamos los emoticones para que se vean        
-        normal_word = r"(?:\w[\w']+)"
-        ascii_art = r"(?:[{punctuation}][{punctuation}]+)".format(punctuation=string.punctuation)
-        emoji = r"(?:[^\s])(?<![\w{ascii_printable}])".format(ascii_printable=string.printable)
-        regexp = r"{normal_word}|{ascii_art}|{emoji}".format(normal_word=normal_word, ascii_art=ascii_art,                                                     emoji=emoji)
-        d = path.dirname(__file__) if "__file__" in locals() else os.getcwd()
-        font_path = path.join(d, 'Symbola.ttf')
-        
-        #Armamos la nube
-        wc = WordCloud( font_path=font_path,regexp=regexp,
-                       width=1600,
-                       height=800,
-                       background_color = "white",
-                       contour_width = 3,
-                       contour_color = 'steelblue',
-                       max_words = 100,
-                       collocations=False).generate_from_text(textos)
-        plt.figure(figsize = (10,8), dpi = 100)
-        plt.title('Nube de Palabras - Comuna {}'.format(c), fontsize = 20)
-        plt.imshow(wc, interpolation='bilinear')
-        plt.axis("off")
-        plt.savefig(archivo_imagen[:-4] + 'Comuna{}'.format(c) + archivo_imagen[-4:],bbox_inches='tight')
-        #    plt.show()
-        plt.clf()
-    
-    

@@ -32,6 +32,7 @@ Larreta.cargar_usuarios(path + archivo_usuarios)
 
 #Funciones
 Larreta.plot_tipo_tweet()
+
 Larreta.plot_evolucion_temporal()
 Larreta.armar_grafo(tipo='usuarios',archivo_grafo=archivo_grafo,tipo_enlace='',dirigido=False)
 Larreta.armar_grafo(tipo='hashtags',archivo_grafo=archivo_grafo_hash,tipo_enlace='',dirigido=False)

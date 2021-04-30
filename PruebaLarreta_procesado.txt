@@ -1,0 +1,2 @@
+tw_id,tw_created_at,tw_text,tw_favCount,tw_rtCount,tw_qtCount,tw_rpCount,tw_location,user_id,user_screenName,hashtags,menciones,or_id,or_created_at,tw_text,tw_favCount,tw_rtCount,tw_qtCount,tw_rpCount,tw_location,user_id,user_screenName,hashtags,menciones,relacion_nuevo_original
+1385705683216224257,2021-04-23 21:22:34+00:00,Entre tantos muertos que se sume el nuevo muerto político y se vaya solo. #LarretaRenunciaYa,0,0,0,0,None,1374097018008780800,GhioEdith,LarretaRenunciaYa ,,
