@@ -335,7 +335,7 @@ class Bases_Datos():
         else:
             fecha_inicial=pd.to_datetime(fecha_inicial).tz_localize('UTC')
         
-        d = self.tweets[['tw_id', 'tw_created_at']].drop_duplicates().rename({'or_id' : 'id', 'or_created_at' : 'fecha'}, axis = 1)
+        d = self.tweets[['or_id', 'or_created_at']].drop_duplicates().rename({'or_id' : 'id', 'or_created_at' : 'fecha'}, axis = 1)
         d['relacion'] = 'Original'
         d = d.append(self.tweets[['tw_id','tw_created_at','relacion_nuevo_original']].rename({'tw_id' : 'id', 'tw_created_at' : 'fecha', 'relacion_nuevo_original' : 'relacion'}, axis = 1))
         #d['fecha'] = d['fecha'].apply(pd.to_datetime, utc = None)
@@ -357,6 +357,7 @@ class Bases_Datos():
         ax.set_xlabel('Fecha',)
         ax.set_title('Evolución Temporal',)
         ax.grid(linestyle = 'dashed')
+        ax.tick_params(axis='x', rotation=45)
         if archivo_imagen == '':
             plt.show()
         else:
@@ -522,9 +523,9 @@ class Bases_Datos():
         else:
             fecha_inicial=pd.to_datetime(fecha_inicial).tz_localize('UTC')
 
-        d= self.tweets[(self.tweets.tw_created_at.between(fecha_inicial, fecha_final))|((self.tweets.relacion_nuevo_original=='Original') & (self.tweets.or_created_at.between(fecha_inicial, fecha_final)))]
+        d = self.tweets[(self.tweets.tw_created_at.between(fecha_inicial, fecha_final))|((self.tweets.relacion_nuevo_original=='Original') & (self.tweets.or_created_at.between(fecha_inicial, fecha_final)))].copy()
         
-        datos = pd.DataFrame(data = {'Hashtags' : ' '.join(d.tw_hashtags.dropna().values).split()})['Hashtags'].value_counts().sort_values(ascending = True).copy()
+        datos = pd.DataFrame(data = {'Hashtags' : ' '.join(d.tw_hashtags.dropna().values).split()})['Hashtags'].value_counts().sort_values(ascending = True)
         
         sbn.set_context("paper", font_scale = 2)
         fig, ax = plt.subplots(figsize = (11,8))
@@ -542,6 +543,38 @@ class Bases_Datos():
             plt.savefig(archivo_imagen,bbox_inches='tight')
             plt.show()            
         sbn.reset_orig()
+    
+    def plot_principales_Usuarios(self, metrica_interes = 'or_rtCount',archivo_imagen = '', fecha_inicial = '', fecha_final = '', cant_usuarios = 10):
+        if fecha_final=='':
+            fecha_final=max(self.tweets['tw_created_at'])
+        else:
+            fecha_final=pd.to_datetime(fecha_final).tz_localize('UTC')
+        if fecha_inicial=='':
+            fecha_inicial=min(self.tweets['tw_created_at'])
+        else:
+            fecha_inicial=pd.to_datetime(fecha_inicial).tz_localize('UTC')
+            
+        d = self.tweets[self.tweets.or_created_at.between(fecha_inicial, fecha_final)].copy()
+        d = d.drop_duplicates(subset = 'or_id', keep = 'last') # Nos quedamos con los or_id únicos, correspondientes al último que fue replicado, así las métricas son las más actualizadas
+        d_sum = d.groupby('or_user_screenName')[metrica_interes].sum().reset_index().rename({metrica_interes : metrica_interes[3:]}, axis = 1) # Sumamos las métricas en cuestión de todos los tweets de un usuario
+        d_count = d.groupby('or_user_screenName')[metrica_interes].count().reset_index().rename({metrica_interes : 'Cantidad de Tweets'}, axis = 1) # Contamos los tweets distintos generados por el usuario, para también reportar esto
+        
+        d = d_sum.merge(d_count, on = 'or_user_screenName').sort_values(metrica_interes[3:], ascending = False)
+        
+        
+        sbn.set_context("paper", font_scale = 2)
+        fig, ax = plt.subplots(figsize = (7,11))
+        fig.patch.set_visible(False)
+        ax.axis('off')
+        ax.axis('tight')
+        ax.table(cellText = d.values[:cant_usuarios], colLabels = d.columns, loc='center')
+        if archivo_imagen == '':
+            plt.show()
+        else:
+            plt.savefig(archivo_imagen,bbox_inches='tight')
+            plt.show()            
+        sbn.reset_orig()
+        return None
 
 # -------------- Defino una función de lectura y pre-procesamiento del archivo con los tweets descargados ------------
 
