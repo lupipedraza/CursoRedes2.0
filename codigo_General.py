@@ -215,9 +215,14 @@ def pescar_usuarios(Usuarios,Archivo_Tweets,Cantidad=100):
 
         
 class Bases_Datos():
-    
+    """
+    Clase donde guardaremos toda la información procesada, y desde donde la analizaremos. 
+    Está compuesta por métodos para cargar y guardar la información en archivos de texto, métodos para plotear los análisis realizados y métodos para armar y guardar los grafos que podamos leer desde gephi.
+    """
     def __init__(self):
-        
+        """
+        Arma la base de datos con todos sus elementos, empezándola vacía.
+        """
         self.tweets=pd.DataFrame() 
         self.usuarios=pd.DataFrame() 
  
@@ -227,6 +232,7 @@ class Bases_Datos():
  
 
     def cargar_datos(self,archivo_datos):
+        "Cargar en Bases_Datos la información procesada sobre los tweets que guardamos en el archivo_datos."
         datos = pd.read_csv(archivo_datos,
                             sep = ',',
                             error_bad_lines = False,
@@ -237,27 +243,37 @@ class Bases_Datos():
         self.tweets=datos 
         
     def cargar_usuarios(self,archivo_usuarios):
+        "Cargar en Bases_Datos la información procesada sobre los usuarios que guardamos en el archivo_usuario."
+
         with open(archivo_usuarios) as json_file:
              datos_usuarios= json.load(json_file)
         self.usuarios=datos_usuarios
         
     def cargar_grafo(self,archivo_grafo):
+        "Volver a cargar el grafo que armamos en caso que lo hayamos modificado."
+
         self.grafo=nx.read_gexf(archivo_grafo)
         
     def guardar_datos(self,archivo_datos):
+        "Volver a guardar los datos de los tweets en el archivo_datos en caso que lo hayamos moficiado en Bases_Datos" 
         self.tweets.to_csv(archivo_datos) 
         
     def guardar_usuarios(self,archivo_usuarios):
+        "Volver a guardar los datos de los usuarios en el archivo_usuarios en caso que lo hayamos moficiado en Bases_Datos"
         with open(archivo_usuarios, 'w') as outfile:
             json.dump(self.usuarios, outfile)
             
-    def guardar_usuaruis(self,archivo_grafo):
+    def guardar_grafo(self,archivo_grafo):
+        "Volver a guardar los datos de los grafos en el archivo_usuarios en caso que lo hayamos moficiado en Bases_Datos"
         nx.write_gexf(self.grafo, archivo_grafo)
 
 
     # Analisis Estadisticos
     def plot_rol_usuario(self,archivo_imagen=''): # Rol de los usuarios a partir de los datos preprocesados 
-
+        """
+        Gráfico de torta que muestra el porcentaje de usuarios de todos los tweets mostrados (originales o nuevos) según si escribieron tweets nuevos, citaron o retwitearon.
+        Se muestran los usuarios que realizaron más de una acción en las intersecciones.
+        """
         usuarios_generadores = set(self.tweets.or_user_screenName.values) #Conjunto de usuarios que tienen tweets originales
         usuarios_retweeteadores = set(self.tweets[self.tweets.relacion_nuevo_original == 'RT'].tw_user_screenName.values) #Conjunto de usuarios que retwitearon tweets
         usuarios_citadores = set(self.tweets[self.tweets.relacion_nuevo_original == 'QT'].tw_user_screenName.values) #Conjunto de usuarios que citaron
@@ -488,6 +504,15 @@ class Bases_Datos():
   
 
     def plot_nube(self, usuarios = None, archivo_imagen = '',fecha_inicial = '', fecha_final = ''): 
+            """
+            Gráfico de una nube de palabras principales de los tweets.
+            Utilizándo el parámetro usuarios se puede utilizar de tres maneras.
+            Si no se completa se graficará la nube de todos los tweets levantados
+            Si se completa con el screen_name de un usuario (entre comillas) se mostrará la nube de todos los tweets escritos por esa persona
+            Si se completa con el screen_name de varios usuarios (entre corchetes y comillas: ['usuario1','usuario2','usuario3'] ) se mostrará la nube de todos los tweets escritos por ese conjunto de personas             
+            Se pueden usar los parámetros fecha_inicial y fecha_final para filtrar por fechas. Si no se completa se utilizarán todos los tweets realizados entre los tiempos de levantados (esto no incluye tweets más viejos que hayan sido retwiteados y citados)
+            """
+        
             if fecha_final=='':
                 fecha_final=max(self.tweets['tw_created_at'])
             else:
@@ -514,6 +539,12 @@ class Bases_Datos():
             nube_palabras(textos_completos, archivo_imagen )
     
     def plot_principales_Hashtags(self, archivo_imagen = '', fecha_inicial = '', fecha_final = ''):
+        """
+        Gráfico de los principales Hashtags utilizados en todos los tweets.
+        Se pueden usar los parámetros fecha_inicial y fecha_final para filtrar por fechas. Si no se completa se utilizarán todos los tweets realizados entre los tiempos de levantados (esto no incluye tweets más viejos que hayan sido retwiteados y citados)
+
+        """
+        
         if fecha_final=='':
             fecha_final=max(self.tweets['tw_created_at'])
         else:
@@ -545,6 +576,13 @@ class Bases_Datos():
         sbn.reset_orig()
     
     def plot_principales_Usuarios(self, metrica_interes = 'or_rtCount',archivo_imagen = '', fecha_inicial = '', fecha_final = '', cant_usuarios = 10):
+        """
+        Gráfico que muestra los usuarios principales.
+        Con el parámetrio metrica_interes se puede elegir qué metrica utilizar.
+        COMPLETAR LAS METRICAS
+        Se pueden usar los parámetros fecha_inicial y fecha_final para filtrar por fechas. Si no se completa se utilizarán todos los tweets realizados entre los tiempos de levantados (esto no incluye tweets más viejos que hayan sido retwiteados y citados)
+
+        """
         if fecha_final=='':
             fecha_final=max(self.tweets['tw_created_at'])
         else:
@@ -584,7 +622,9 @@ class Bases_Datos():
 
 
 def guardar_tweet(tweet):
-
+            """
+            Función auxiliar que utilizaremos en la función procesar
+            """
             data={}
             data['tw_id']=tweet['id_str']
             data['tw_created_at']=pd.to_datetime(tweet['created_at'])
@@ -619,6 +659,10 @@ def guardar_tweet(tweet):
             return data
     
 def guardar_usuario(usuario):
+        """
+        Función auxiliar que utilizaremos en la función procesar
+        """
+
         data={}
         data['id_str']=usuario['id_str']
         data['screen_name']=usuario['screen_name']
@@ -640,6 +684,10 @@ def guardar_usuario(usuario):
         return(data)
 
 def procesamiento(archivo_tweets,archivo_guardado,archivo_usuarios):
+        """
+        Función que utiliza la información descargada por tweepy y guardada en archivo_tweets.
+        Devuelve dos archivos archivo_guardado y archivo_usuarios que pueden ser cargados en Bases_Datos.
+        """
         usuarios={}
         with open(archivo_guardado, 'w', encoding = 'utf-8') as arch:
                     arch.write(','.join([

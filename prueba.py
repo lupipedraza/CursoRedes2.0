@@ -38,7 +38,6 @@ Larreta.armar_grafo(tipo='usuarios',archivo_grafo=archivo_grafo,tipo_enlace='',d
 Larreta.armar_grafo(tipo='hashtags',archivo_grafo=archivo_grafo_hash,tipo_enlace='',dirigido=False)
 Larreta.agregar_centrality()
 Larreta.plot_nube()
-Larreta.plot_principales_Hashtags()
 Larreta.plot_nube('veronik50799452')
 
 

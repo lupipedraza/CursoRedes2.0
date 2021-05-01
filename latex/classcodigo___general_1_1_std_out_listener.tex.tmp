@@ -1,0 +1,38 @@
+\hypertarget{classcodigo___general_1_1_std_out_listener}{}\doxysection{codigo\+\_\+\+General.\+Std\+Out\+Listener Class Reference}
+\label{classcodigo___general_1_1_std_out_listener}\index{codigo\_General.StdOutListener@{codigo\_General.StdOutListener}}
+
+
+Inheritance diagram for codigo\+\_\+\+General.\+Std\+Out\+Listener\+:
+% FIG 0
+
+
+Collaboration diagram for codigo\+\_\+\+General.\+Std\+Out\+Listener\+:
+% FIG 1
+\doxysubsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{classcodigo___general_1_1_std_out_listener_a63090d833d495181fed237b67b5428cd}\label{classcodigo___general_1_1_std_out_listener_a63090d833d495181fed237b67b5428cd}} 
+def {\bfseries \+\_\+\+\_\+init\+\_\+\+\_\+} (self, fetched\+\_\+tweets\+\_\+filename)
+\item 
+\mbox{\Hypertarget{classcodigo___general_1_1_std_out_listener_a04cdbbe5230adc828ea1a637745acb7c}\label{classcodigo___general_1_1_std_out_listener_a04cdbbe5230adc828ea1a637745acb7c}} 
+def {\bfseries on\+\_\+data} (self, data)
+\item 
+\mbox{\Hypertarget{classcodigo___general_1_1_std_out_listener_a485eb7bba16f9277b364c202659bc5f0}\label{classcodigo___general_1_1_std_out_listener_a485eb7bba16f9277b364c202659bc5f0}} 
+def {\bfseries on\+\_\+error} (self, status)
+\end{DoxyCompactItemize}
+\doxysubsection*{Public Attributes}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{classcodigo___general_1_1_std_out_listener_a46cf8cc9d48db052c4e99cd9f31a2df9}\label{classcodigo___general_1_1_std_out_listener_a46cf8cc9d48db052c4e99cd9f31a2df9}} 
+{\bfseries fetched\+\_\+tweets\+\_\+filename}
+\end{DoxyCompactItemize}
+
+
+\doxysubsection{Detailed Description}
+\begin{DoxyVerb}This is a basic listener that just prints received tweets to stdout.
+\end{DoxyVerb}
+ 
+
+The documentation for this class was generated from the following file\+:\begin{DoxyCompactItemize}
+\item 
+codigo\+\_\+\+General.\+py\end{DoxyCompactItemize}
