@@ -583,7 +583,7 @@ def guardar_tweet(tweet):
 
             data={}
             data['tw_id']=tweet['id_str']
-            data['tw_created_at']=tweet['created_at']
+            data['tw_created_at']=pd.to_datetime(tweet['created_at'])
             try:
                 data['tw_text']=tweet['extended_tweet']['full_text'].replace('\n',' ').replace(',',' ')
             except:
@@ -599,6 +599,7 @@ def guardar_tweet(tweet):
                 data['tw_location']=' '
             data['user_id']=tweet['user']['id_str']
             data['user_screenName']=tweet['user']['screen_name']
+            data['user_followers_count'] = tweet['user']['followers_count']
             hashtags = ''
             if len(tweet['entities']['hashtags']) != 0:
                 for h in tweet['entities']['hashtags']:
@@ -608,10 +609,9 @@ def guardar_tweet(tweet):
             if len(tweet['entities']['user_mentions']) != 0:
                 for um in tweet['entities']['user_mentions']:
                     menciones += um['screen_name'] + ' '
-            data['tw_menciones']=menciones
+            data['tw_menciones'] = menciones
             
-            data['tw_created_at'] = pd.to_datetime(data['tw_created_at'])
-            # data.to_csv(nombre_archivo_guardado, sep = ',') # podría ya grabar el archivo procesado
+                        
             return data
     
 def guardar_usuario(usuario):
@@ -638,7 +638,7 @@ def guardar_usuario(usuario):
 def procesamiento(archivo_tweets,archivo_guardado,archivo_usuarios):
         usuarios={}
         with open(archivo_guardado, 'w', encoding = 'utf-8') as arch:
-                    arch.write('{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n'.format(
+                    arch.write(','.join([
                             
             'tw_id' , # id del tweet
             'tw_created_at', # fecha de creacion
@@ -650,6 +650,7 @@ def procesamiento(archivo_tweets,archivo_guardado,archivo_usuarios):
             'tw_location' , # location del tweet (usaremos el place)
             'tw_user_id' , # id del usuario
             'tw_user_screenName', # screen name del usuario
+            'tw_user_followers_count',
             'tw_hashtags',
             'tw_menciones',
                               
@@ -664,10 +665,12 @@ def procesamiento(archivo_tweets,archivo_guardado,archivo_usuarios):
             'or_location', # location del tweet (usaremos el place)
             'or_user_id' , # id del usuario
             'or_user_screenName', # screen name del usuario
+            'or_user_followers_count',
             'or_hashtags',
             'or_menciones',
             
-            'relacion_nuevo_original'))
+            'relacion_nuevo_original',]))
+                    arch.write('\n')
 
         with open(archivo_tweets, 'r', buffering = 1000000) as f:
             for line in f.read().split('\n'):
@@ -686,10 +689,10 @@ def procesamiento(archivo_tweets,archivo_guardado,archivo_usuarios):
                         
                         #Guardamos toda la fila
                         with open(archivo_guardado, 'a', encoding = 'utf-8') as arch:
-                            #t1,t2,t3,t4,t5,t6=guardar_tweet(tweet)
-                            arch.write('{},{},{},{},{},{},{},{},{},{},{},{},'.format(*guardar_tweet(tweet).values()))
-                            #t1,t2,t3,t4,t5,t6=guardar_tweet(tweet_original)
-                            arch.write('{},{},{},{},{},{},{},{},{},{},{},{},'.format(*guardar_tweet(tweet_original).values()))
+                            arch.write(','.join([str(i) for i in guardar_tweet(tweet).values()]))
+                            arch.write(',')
+                            arch.write(','.join([str(i) for i in guardar_tweet(tweet_original).values()]))
+                            arch.write(',')
                             arch.write('{}\n'.format(relacion_nuevo_original))                    #Citas
                     elif 'quoted_status' in tweet.keys(): #Si el original es una cita
                         tweet_original = tweet['quoted_status']
@@ -699,18 +702,18 @@ def procesamiento(archivo_tweets,archivo_guardado,archivo_usuarios):
                         relacion_nuevo_original = 'QT' #Guardamos que la relación es un retweet
     
                         with open(archivo_guardado, 'a', encoding = 'utf-8') as arch:
-                            #t1,t2,t3,t4,t5,t6=guardar_tweet(tweet).values()
-                            arch.write('{},{},{},{},{},{},{},{},{},{},{},{},'.format(*guardar_tweet(tweet).values()))
-                            #t1,t2,t3,t4,t5,t6=guardar_tweet(tweet_original).values()
-                            arch.write('{},{},{},{},{},{},{},{},{},{},{},{},'.format(*guardar_tweet(tweet_original).values()))
+                            arch.write(','.join([str(i) for i in guardar_tweet(tweet).values()]))
+                            arch.write(',')
+                            arch.write(','.join([str(i) for i in guardar_tweet(tweet_original).values()]))
+                            arch.write(',')
                             arch.write('{}\n'.format(relacion_nuevo_original))
                     else:
                         relacion_nuevo_original = 'Original' #Guardamos que la relación es un retweet
                         with open(archivo_guardado, 'a', encoding = 'utf-8') as arch:
-                            #t1,t2,t3,t4,t5,t6=guardar_tweet(tweet).values()
-                            arch.write('{},{},{},{},{},{},{},{},{},{},{},{},'.format("","","","","","","","","","","",""))
-                            arch.write('{},{},{},{},{},{},{},{},{},{},{},{},'.format(*guardar_tweet(tweet).values()))
-
+                            arch.write(','.join(['' for i in guardar_tweet(tweet).values()]))
+                            arch.write(',')
+                            arch.write(','.join([str(i) for i in guardar_tweet(tweet).values()]))
+                            arch.write(',')
                             arch.write('{}\n'.format(relacion_nuevo_original))   
                     
                     with open(archivo_usuarios, 'w') as outfile:
