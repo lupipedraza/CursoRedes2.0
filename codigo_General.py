@@ -560,10 +560,10 @@ class Bases_Datos():
         d_count = d.groupby('or_user_screenName')[metrica_interes].count().reset_index().rename({metrica_interes : 'Cantidad de Tweets'}, axis = 1) # Contamos los tweets distintos generados por el usuario, para también reportar esto
         
         d = d_sum.merge(d_count, on = 'or_user_screenName').sort_values(metrica_interes[3:], ascending = False)
-        
+        d['Promedio'] = (d[metrica_interes[3:]] / d['Cantidad de Tweets']).apply(round, 3)
         
         sbn.set_context("paper", font_scale = 2)
-        fig, ax = plt.subplots(figsize = (7,11))
+        fig, ax = plt.subplots(figsize = (7,11), dpi = 200)
         fig.patch.set_visible(False)
         ax.axis('off')
         ax.axis('tight')
@@ -574,7 +574,11 @@ class Bases_Datos():
             plt.savefig(archivo_imagen,bbox_inches='tight')
             plt.show()            
         sbn.reset_orig()
+    
+    def plot_usuarios_Tendencia():
+        
         return None
+
 
 # -------------- Defino una función de lectura y pre-procesamiento del archivo con los tweets descargados ------------
 
