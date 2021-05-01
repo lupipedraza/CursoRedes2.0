@@ -337,10 +337,20 @@ class Bases_Datos():
         plt.clf()
         sbn.reset_orig()
         
-    def plot_evolucion_temporal(self, archivo_imagen = '',fecha_inicial = '',fecha_final = '', frecuencia = '2min'):
+    def plot_evolucion_temporal(self, archivo_imagen = '',fecha_inicial = '',fecha_final = '', frecuencia = '15min'):
         """
         Esta función toma como entrada el archivo de datos preprocesados y 
         devuelve la evolución temporal de cantidad de tweets, RT y QT
+        
+        fecha_inicial : str
+        		 indicamos la fecha apartir de la cual consideramos el análisis. Si no ponemos nada, se setea en la fecha y hora de inicio de descarga
+        fecha_final : str
+        		indicamos la fecha de corte del análisis. Por default, es la correspondiente al final de la descarga
+        frecuencia : str
+        		indica cada cuanto bineamos los datos temporalmente. Tiene que ser de la forma '1min', '1seg', '1h','1d'. Osea, número más algo que indique la cantidad
+        archivo_imagen : str
+        		nombre que le pondremos al gráfico de querer guardarlo
+        
         """
         if fecha_final=='':
             fecha_final=max(self.tweets['tw_created_at'])
